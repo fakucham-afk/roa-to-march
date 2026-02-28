@@ -7,15 +7,8 @@ app.set('view engine', 'ejs');
 app.use(express.static('public')); 
 app.use(express.urlencoded({ extended: true })); 
 
-// --- 【重要】Render用の認証情報読み込み設定 ---
-// 手元の credentials.json ではなく、RenderのEnvironment Variablesから読み込みます
-let creds;
-try {
-    creds = JSON.parse(process.env.GOOGLE_CREDS);
-} catch (e) {
-    console.error("環境変数 GOOGLE_CREDS が正しく設定されていない可能性があります。");
-    process.exit(1); 
-}
+// Renderの環境変数から認証情報を読み込む
+const creds = JSON.parse(process.env.GOOGLE_CREDS);
 
 const serviceAccountAuth = new JWT({
     email: creds.client_email,
@@ -25,8 +18,6 @@ const serviceAccountAuth = new JWT({
 
 const SPREADSHEET_ID = '12YjC4Gz5hP1utf3JlYo5-KqwB-hegaqFKtfIydggPm4'; 
 const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
-
-// --- ルート設定 ---
 
 app.get('/', (req, res) => res.render('login'));
 
@@ -47,9 +38,18 @@ app.get('/mypage/:id', async (req, res) => {
         const studentId = req.params.id;
         await doc.loadInfo();
 
+        // 【日本時間で今日の日付を取得】
+        const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+
         const attendRows = await doc.sheetsByTitle['登校ログ'].getRows();
         const earnedLogs = attendRows.filter(row => row.get('studentId').toString().trim() === studentId.trim());
         const earnedCount = earnedLogs.length;
+
+        // 【新機能】重複チェック：今日すでに登校しているか
+        const hasAttendedToday = earnedLogs.some(row => row.get('date') === today);
+
+        // 【新機能】登校履歴（新しい順に並び替え）
+        const attendanceHistory = earnedLogs.map(row => row.get('date')).reverse();
 
         const consumeRows = await doc.sheetsByTitle['ガチャ消費ログ'].getRows();
         const userConsumeRows = consumeRows.filter(row => row.get('studentId').toString().trim() === studentId.trim());
@@ -83,7 +83,10 @@ app.get('/mypage/:id', async (req, res) => {
             if (!alreadyPulled) hasBonus = true;
         }
 
-        res.render('mypage', { id: studentId, gachaTickets, userType, earnedCount, unexchangedPrizes, hasBonus, bonusType });
+        res.render('mypage', { 
+            id: studentId, gachaTickets, userType, earnedCount, unexchangedPrizes, 
+            hasBonus, bonusType, hasAttendedToday, attendanceHistory 
+        });
     } catch (err) { res.status(500).send('Mypage Error'); }
 });
 
@@ -91,8 +94,19 @@ app.post('/attend', async (req, res) => {
     const { studentId } = req.body;
     try {
         await doc.loadInfo();
-        const today = new Date().toLocaleDateString('ja-JP');
-        await doc.sheetsByTitle['登校ログ'].addRow({ date: today, studentId });
+        const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        
+        const attendSheet = doc.sheetsByTitle['登校ログ'];
+        const rows = await attendSheet.getRows();
+        // サーバー側でも重複チェック
+        const alreadyDone = rows.some(row => 
+            row.get('studentId').toString().trim() === studentId.trim() && 
+            row.get('date') === today
+        );
+
+        if (!alreadyDone) {
+            await attendSheet.addRow({ date: today, studentId });
+        }
         res.redirect(`/mypage/${studentId}`);
     } catch (err) { res.status(500).send('Attend Error'); }
 });
@@ -103,7 +117,7 @@ app.get('/gacha/:id', async (req, res) => {
         await doc.loadInfo();
         const prizes = await doc.sheetsByTitle['景品'].getRows();
         const resultText = prizes[Math.floor(Math.random() * prizes.length)].get('prizeName');
-        await doc.sheetsByTitle['ガチャ消費ログ'].addRow({ date: new Date().toLocaleString('ja-JP'), studentId, action: '通常', prize: resultText, status: '未交換' });
+        await doc.sheetsByTitle['ガチャ消費ログ'].addRow({ date: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }), studentId, action: '通常', prize: resultText, status: '未交換' });
         res.render('gacha', { id: studentId, result: resultText });
     } catch (err) { res.status(500).send('Gacha Error'); }
 });
@@ -115,7 +129,7 @@ app.get('/bonus-gacha/:id/:count/:type', async (req, res) => {
         const sheetName = `ボーナス景品${type}`;
         const prizes = await doc.sheetsByTitle[sheetName].getRows();
         const resultText = prizes[Math.floor(Math.random() * prizes.length)].get('prizeName');
-        await doc.sheetsByTitle['ガチャ消費ログ'].addRow({ date: new Date().toLocaleString('ja-JP'), studentId: id, action: 'ボーナス', prize: `🎁【${count}回達成】${resultText}`, status: '未交換' });
+        await doc.sheetsByTitle['ガチャ消費ログ'].addRow({ date: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }), studentId: id, action: 'ボーナス', prize: `🎁【${count}回達成】${resultText}`, status: '未交換' });
         res.render('gacha', { id, result: resultText });
     } catch (err) { res.status(500).send('Bonus Error'); }
 });
@@ -141,7 +155,5 @@ app.post('/consume-ticket', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// --- ポート設定 ---
-// Render環境では process.env.PORT を使うのが決まりです
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -7,7 +7,16 @@ app.set('view engine', 'ejs');
 app.use(express.static('public')); 
 app.use(express.urlencoded({ extended: true })); 
 
-const creds = require('./credentials.json');
+// --- 【重要】Render用の認証情報読み込み設定 ---
+// 手元の credentials.json ではなく、RenderのEnvironment Variablesから読み込みます
+let creds;
+try {
+    creds = JSON.parse(process.env.GOOGLE_CREDS);
+} catch (e) {
+    console.error("環境変数 GOOGLE_CREDS が正しく設定されていない可能性があります。");
+    process.exit(1); 
+}
+
 const serviceAccountAuth = new JWT({
     email: creds.client_email,
     key: creds.private_key,
@@ -16,6 +25,8 @@ const serviceAccountAuth = new JWT({
 
 const SPREADSHEET_ID = '12YjC4Gz5hP1utf3JlYo5-KqwB-hegaqFKtfIydggPm4'; 
 const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+
+// --- ルート設定 ---
 
 app.get('/', (req, res) => res.render('login'));
 
@@ -43,9 +54,8 @@ app.get('/mypage/:id', async (req, res) => {
         const consumeRows = await doc.sheetsByTitle['ガチャ消費ログ'].getRows();
         const userConsumeRows = consumeRows.filter(row => row.get('studentId').toString().trim() === studentId.trim());
         
-        // 【重要修正】「交換済み」以外のチケット（未交換 または 空欄）だけを表示リストに入れる
         const unexchangedPrizes = userConsumeRows.filter(row => {
-            const status = row.get('status');
+            const status = (row.get('status') || "").toString().trim();
             return status !== '交換済み';
         });
 
@@ -131,4 +141,7 @@ app.post('/consume-ticket', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.listen(3000, () => console.log('http://localhost:3000'));
+// --- ポート設定 ---
+// Render環境では process.env.PORT を使うのが決まりです
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

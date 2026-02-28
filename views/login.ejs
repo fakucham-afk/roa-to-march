@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"><title>ログイン</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="card">
+        <h1>🌸 ログイン 🌸</h1>
+        <form action="/login" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
+            <input type="text" name="studentId" placeholder="生徒番号" required style="padding: 10px; border-radius: 5px; border: 1px solid #ffb7c5;">
+            <select name="type" required style="padding: 10px; border-radius: 5px; border: 1px solid #ffb7c5;">
+                <option value="" disabled selected>学年を選択</option>
+                <option value="受験生">受験生</option>
+                <option value="低学年">低学年</option>
+            </select>
+            <button type="submit" class="btn-main">ログイン / 新規登録</button>
+        </form>
+    </div>
+</body>
+</html>

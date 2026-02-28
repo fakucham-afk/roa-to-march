@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"><title>Road to 3月 | マイページ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background: #fff5f7; font-family: sans-serif; margin: 0; padding: 20px; }
+        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; text-align: center; }
+        .status-val { font-size: 2em; font-weight: bold; color: #d81b60; }
+        .btn-attend { width: 100%; background: #ff4081; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
+        .prize-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #ff4081; }
+        .bonus-box { background: linear-gradient(135deg, #fff9c4, #fff176); border: 2px dashed #fbc02d; padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div style="font-size: 0.8em; color: #aaa;">ID: <%= id %> | <%= userType %></div>
+        <h1 style="color: #d81b60; margin: 10px 0;">Road to 3月</h1>
+    </div>
+
+    <form action="/attend" method="POST">
+        <input type="hidden" name="studentId" value="<%= id %>">
+        <button type="submit" class="btn-attend">🐾 登校を記録する</button>
+    </form>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div class="card" style="flex: 1;">
+            <div class="status-val"><%= earnedCount %></div>
+            <div style="font-size: 0.8em; color: #666;">登校日数</div>
+        </div>
+        <div class="card" style="flex: 1;">
+            <div class="status-val"><%= gachaTickets %></div>
+            <div style="font-size: 0.8em; color: #666;">ガチャ券</div>
+        </div>
+    </div>
+
+    <% if (hasBonus) { %>
+        <div class="bonus-box">
+            <h3 style="margin: 0; color: #d84315;">🎊 確定報酬<%= bonusType %>獲得！</h3>
+            <button onclick="location.href='/bonus-gacha/<%= id %>/<%= earnedCount %>/<%= bonusType %>'" style="background:#fbc02d; color:white; border:none; padding:10px 20px; border-radius:20px; margin-top:10px; font-weight:bold; cursor:pointer;">特別報酬を引く！</button>
+        </div>
+    <% } %>
+
+    <div class="card">
+        <% if (gachaTickets > 0) { %>
+            <button onclick="location.href='/gacha/<%= id %>'" style="background:#d81b60; color:white; border:none; padding:12px 25px; border-radius:25px; font-weight:bold; cursor:pointer;">ガチャを回す</button>
+        <% } else { %>
+            <button disabled style="background:#ccc; color:white; border:none; padding:12px 25px; border-radius:25px;">ガチャ券なし</button>
+        <% } %>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <h3 style="font-size: 1em; color: #d81b60; border-bottom: 2px solid #ffb7c5; padding-bottom: 5px; margin-bottom: 15px;">🎁 獲得チケット一覧</h3>
+        <% if (unexchangedPrizes && unexchangedPrizes.length > 0) { %>
+            <% unexchangedPrizes.forEach((prize, index) => { %>
+                <div class="prize-item" id="prize-<%= index %>">
+                    <div style="text-align: left; padding-left: 10px;">
+                        <div style="font-weight: bold; font-size: 1.1em; color: #333;"><%= prize.get('prize') %></div>
+                        <div style="font-size: 0.75em; color: #aaa;">獲得日: <%= prize.get('date') %></div>
+                    </div>
+                    <button id="btn-<%= index %>" onclick="usePrize('<%= prize.get('prize') %>', '<%= prize.get('date') %>', <%= index %>)" style="background:#4caf50; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold; margin-right: 10px;">使用</button>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <p style="text-align: center; color: #ccc; font-size: 0.8em;">チケットはありません</p>
+        <% } %>
+    </div>
+
+    <script>
+        async function usePrize(name, date, index) {
+            if (!confirm('【 ' + name + ' 】を使用済みにしますか？\nスタッフに提示してください。')) return;
+            
+            // ボタンを無効化して連打を防ぐ
+            const btn = document.getElementById('btn-' + index);
+            btn.disabled = true;
+            btn.style.background = '#ccc';
+            btn.innerText = '処理中...';
+
+            const params = new URLSearchParams();
+            params.append('studentId', '<%= id %>');
+            params.append('prizeName', name);
+            params.append('date', date);
+
+            try {
+                const res = await fetch('/consume-ticket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+
+                if (res.ok) { 
+                    alert('交換しました！'); 
+                    location.reload(); // リロードしてリストから完全に消す
+                } else {
+                    alert('交換に失敗しました。');
+                    btn.disabled = false;
+                    btn.style.background = '#4caf50';
+                    btn.innerText = '使用';
+                }
+            } catch (e) {
+                alert('通信エラーが発生しました。');
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

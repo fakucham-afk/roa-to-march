@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"><title>結果発表</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background: #fff5f7; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .result-card { background: white; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 85%; }
+        .prize-name { font-size: 1.8em; color: #ff4081; font-weight: bold; margin: 20px 0; border: 2px solid #ffb7c5; padding: 15px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div class="result-card">
+        <h2 style="color: #888;">✨ 抽選結果 ✨</h2>
+        <div class="prize-name"><%= result %></div>
+        <p style="color: #666; font-size: 0.9em;">チケットがマイページに追加されました！</p>
+        <button onclick="location.href='/mypage/<%= id %>'" style="background:#ff4081; color:white; border:none; padding:12px 30px; border-radius:25px; font-weight:bold; cursor:pointer; margin-top: 20px;">マイページへ戻る</button>
+    </div>
+</body>
+</html>
